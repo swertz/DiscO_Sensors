@@ -1,0 +1,24 @@
+#######################################
+# Syntax Coloring Map For Disco_Sensors
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+Disco_Sensors	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+begin	KEYWORD2
+readDS	KEYWORD2
+readTempBME	KEYWORD2
+readHumiBME	KEYWORD2
+readCO2CSS	KEYWORD2
+readTVOCCSS	KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
