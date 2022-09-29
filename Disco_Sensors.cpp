@@ -1,169 +1,269 @@
 #include <Disco_Sensors.h>
 
-// Objects Declaration
-OneWire oneWire(ONE_WIRE_BUS);
+float convertHumiToDP(float temp, float humi) {
+    // Magnus formula, values from Sonntag (1990), 0.35°C error for -45<T<60
+    static const float c = 243.12;
+    static const float b = 17.62;
 
-BME280 my_bme;
+    const float gm = logf(humi / 100.0) + b * temp / (c + temp);
 
-CCS811 my_ccs(CCS811_ADDR);
-
-// Pass Wire Reference
-DallasTemperature sensors(&oneWire);
-
-Disco_Sensors::Disco_Sensors(int array_size) {
-  tempC = 0.00;
-  tempBME = 0.00;
-  humiBME = 0.00;
-  bmeDisconnected = false;
-  readAlgorithm = false;
-  my_array_size = array_size;
-
-  // Default alarms setup
-  alarmTemp = false;
-  alarmHumi = false;
-  alarmCO2 = false;
-  alarmTVOC = false;
-
-  // Declare Array of Strings to store data
-  // String* data_array [array_size];
+    return c * gm / (b - gm);
 }
+
+void Disco_Sensors::Disco_Sensors(uint16_t sda = SDA_PIN, uint16_t scl = SCL_PIN, uint16_t onewire = ONE_WIRE_BUS):
+    _sda_pin = sda,
+    _scl_pin = scl,
+    _onewire_bus = onewire) {}
 
 void Disco_Sensors::begin() {
-  // Start DS18B20 Sensors
-  sensors.begin();
-
-  // Start IC Communication
-  Wire.begin(13, 14);
-
-  // Start BME Sensor
-  if (my_bme.beginI2C() == false) {
-    Serial.println("The sensor did not respond. Please check wiring.");
-    while (1)
-      ; // Freeze
+  if (_active_ds) {
+    Serial.println(F("Attempting to connect to DS18B20 sensor over 1-wire ") + String(_onewire_bus));
+    _oneWire = new OneWire(_onewire_bus);
+    _ds = new DallasTemperature(_oneWire);
+    _ds->begin();
+    if (_ds->getDS18Count() < 1) {
+        Serial.println(F("DS sensor did not respond, please check wiring. Deactivating it and moving on..."));
+        _active_ds = false;
+    }
   }
 
-  // Start CCS Sensor
-  if (my_ccs.begin() == false) {
-    Serial.print("CCS811 error. Please check wiring. Freezing...");
-    while (1)
-      ;
+  _active_i2c = _active_bme || _active_ccs || _active_scd;
+  if (_active_i2c) {
+    // Start IC Communication
+    Serial.println("Initiating I2C over pins " + String(_sda_pin) + " and " + String(_scl_pin));
+    Wire.begin(_sda_pin, _scl_pin);
+  }
+
+  if (_active_bme) {
+      _bme = new BME280();
+      _bme->setI2CAddress(BME280_ADDR);
+      Serial.println(F("Attempting to connect to BME280 sensor over I2C"));
+      if (!_bme->beginI2C()) {
+        Serial.println(F("BME280 sensor did not respond, please check address and wiring. Deactivating it and moving on..."));
+        _active_bme = false;
+      }
+  }
+
+  if (_active_ccs) {
+      _ccs = new CCS811(CCS811_ADDR);
+      Serial.println(F("Attempting to connect to CCS811 sensor over I2C"));
+      if (!_ccs->begin()) {
+        Serial.print(F("CCS811 sensor did not respond, please check address and wiring. Deactivating it and moving on..."));
+        _active_ccs = false;
+      }
+  }
+
+  if (_active_scd) {
+      _scd = new SCD30();
+      Serial.println(F("Attempting to connect to SCD30 sensor over I2C"));
+      if (!_scd->begin()) {
+        Serial.print(F("SCD30 sensor did not respond, please check address and wiring. Deactivating it and moving on..."));
+        _active_scd = false;
+      }
   }
 }
 
-float Disco_Sensors::readDS() {
+bool Disco_Sensors::readDS(float &temp) {
+  if (!_active_ds)
+      return false;
+
   // Request Temperature
-  sensors.requestTemperatures();
+  _ds->requestTemperatures();
 
   // Get the readings
-  tempC = sensors.getTempCByIndex(0);
+  temp = _ds->getTempCByIndex(DS_WIRE_POS);
 
-  return tempC;
+  return true;
 }
 
-float Disco_Sensors::readTempBME() {
-  tempBME = my_bme.readTempC();
+bool Disco_Sensors::readTempBME(float &temp) {
+  if (!_active_bme)
+      return false;
+
+  float tempBME = _bme->readTempC();
 
   if (isnan(tempBME)) {
-    bmeDisconnected = true;
-    return NAN;
+    _bmeDisconnected = true;
+    return false;
   } else {
-    if (bmeDisconnected == false) {
-      return tempBME;
+    if (!_bmeDisconnected) {
+      temp = tempBME;
     } else {
-      if (my_bme.beginI2C() != false) {
-        bmeDisconnected = false;
+      if (_bme->beginI2C()) {
+        _bmeDisconnected = false;
       }
-
-      return 0.00;
+      temp = 0.;
     }
+    return true;
   }
 }
 
-float Disco_Sensors::readHumiBME() {
-  humiBME = my_bme.readFloatHumidity();
+bool Disco_Sensors::readHumiBME(float &humi) {
+  if (!_active_bme)
+      return false;
+
+  float humiBME = _bme->readFloatHumidity();
 
   if (isnan(humiBME)) {
-    bmeDisconnected = true;
-    return NAN;
+    _bmeDisconnected = true;
+    return false;
   } else {
-    if (bmeDisconnected == false) {
-      return humiBME;
+    if (!_bmeDisconnected) {
+      humi = humiBME;
     } else {
-      if (my_bme.beginI2C() != false) {
-        bmeDisconnected = false;
+      if (_bme->beginI2C()) {
+        _bmeDisconnected = false;
       }
-      return 0.00;
+      humi = 0.00;
     }
+    return true;
   }
 }
 
-uint16_t Disco_Sensors::readCO2CSS() {
-  co2CCS = my_ccs.getCO2();
+bool Disco_Sensors::readCO2CCS(uint16_t &co2) {
+  if (!_active_ccs)
+    return false;
 
-  if (readAlgorithm == false) {
-    if (readCSS()) {
-      readAlgorithm = true;
-      return co2CCS;
+  auto co2CCS = _ccs->getCO2();
+
+  if (!_ccsReadAlgorithm) {
+    if (readCCS()) {
+      _ccsReadAlgorithm = true;
+      co2 = co2CCS;
     } else {
-      return 65535;
-    }
-
-  } else {
-    readAlgorithm = false;
-    return co2CCS;
-  }
-}
-
-uint16_t Disco_Sensors::readTVOCCSS() {
-  tvocCCS = my_ccs.getTVOC();
-
-  if (readAlgorithm == false) {
-    if (readCSS()) {
-      readAlgorithm = true;
-      return tvocCCS;
-    } else {
-      return 65535;
+      co2 = 65535;
     }
   } else {
-    readAlgorithm = false;
-    return tvocCCS;
-    ;
+    _ccsReadAlgorithm = false;
+    co2 = co2CCS;
   }
+  return true;
 }
 
-void Disco_Sensors::getReadings(String *data_array) {
-  // Read DS18B20
-  float ds_temp_compensate = readDS();
-  data_array[0] = String(ds_temp_compensate);
+bool Disco_Sensors::readTVOCCCS(uint16_t &tvoc) {
+  if (!_active_ccs)
+    return false;
 
-  // Read BME - Temperature
-  data_array[1] = String(readTempBME());
+  float tvocCCS = _ccs->getTVOC();
 
-  // Read BME - Humidity
-  float bme_humi_compensate = readHumiBME();
-  data_array[2] = String(bme_humi_compensate);
-
-  // Read CCS - CO2
-  data_array[3] = String(readCO2CSS());
-
-  // Read CCS - TVOC
-  data_array[4] = String(readTVOCCSS());
-
-  // Set Environmental Data for compensation for next readings
-  my_ccs.setEnvironmentalData(ds_temp_compensate, bme_humi_compensate);
+  if (!_ccsReadAlgorithm) {
+    if (readCCS()) {
+      _ccsReadAlgorithm = true;
+      tvoc = tvocCCS;
+    } else {
+      tvoc = 65535;
+    }
+  } else {
+    _ccsReadAlgorithm = false;
+    tvoc = tvocCCS;
+  }
+  return true;
 }
 
-bool Disco_Sensors::readCSS() {
-  if (my_ccs.dataAvailable()) {
-    my_ccs.readAlgorithmResults();
-
+bool Disco_Sensors::readCCS() {
+  if (_ccs->dataAvailable()) {
+    _ccs->readAlgorithmResults();
     return true;
   } else {
     return false;
   }
 }
 
-void Disco_Sensors::setAlarmSensor(String parameter, float min, float max) {
+bool Disco_Sensors::readCO2SCD(float &co2, float &temp, float &humi) {
+  if (!_active_scd)
+    return false;
+
+  if (_scd->dataAvailable()) {
+    co2 = _scd->getCO2();
+    temp = _scd->getTemperature();
+    humi = _scd->getHumidity();
+    return true;
+  } else {
+    return false;
+  }
+}
+
+bool Disco_Sensors::readTempSCD(float &temp) {
+  if (!_active_scd)
+    return false;
+
+  if (_scd->dataAvailable()) {
+    temp = _scd->getTemperature();
+    return true;
+  } else {
+    return false;
+  }
+}
+
+bool Disco_Sensors::readHumiSCD(float &humi) {
+  if (!_active_scd)
+    return false;
+
+  if (_scd->dataAvailable()) {
+    humi = _scd->getHumidity();
+    return true;
+  } else {
+    return false;
+  }
+}
+
+SensorValues Disco_Sensors::getReadings() {
+  SensorValues values;
+
+  float temp_compensate = LOWEST;
+  float humi_compensate = LOWEST;
+
+  // Read DS18B20
+  float ds_temp;
+  if (readDS(ds_temp)) {
+    values.push_back( { DS_TEMP_TOPIC, String(ds_temp) } );
+    temp_compensate = ds_temp;
+  }
+
+  // Read BME
+  float bme_temp = LOWEST, bme_humi = LOWEST;
+  if (readTempBME(bme_temp)) {
+    values.push_back( { BME_TEMP_TOPIC, String(bme_temp) } );
+    if (temp_compensate == LOWEST) {
+      temp_compensate = bme_temp;
+    }
+  }
+  if (readHumiBME(bme_humi)) {
+    values.push_back( { BME_HUMI_TOPIC, String(bme_humi) } );
+    humi_compensate = bme_humi;
+  }
+  if (bme_temp != LOWEST && bme_humi != LOWEST) {
+    values.push_back( { BME_DEW_TOPIC, String(convertHumiToDP(bme_temp, bme_humi)) } );
+  }
+
+  // Read CCS
+  uint16_t ccs_co2;
+  if (readCO2CCS(ccs_co2)) {
+    values.push_back( { CCS_CO2_TOPIC, String(ccs_co2) } );
+  }
+  uint16_t ccs_tvoc;
+  if (readTVOCCCS(ccs_tvoc)) {
+    values.push_back( { CCS_TVOC_TOPIC, String(ccs_tvoc) } );
+  }
+
+  // Set Environmental Data for compensation for next readings
+  if (_active_ccs && temp_compensate != LOWEST && humi_compensate != LOWEST) {
+    _ccs->setEnvironmentalData(humi_compensate, temp_compensate);
+  }
+
+  // Read SCD30
+  float scd_co2, scd_temp, scd_humi;
+  if (readSCD(scd_co2, scd_temp, scd_humi)) {
+    values.push_back( { SCD_CO2_TOPIC, String(scd_co2) } );
+    values.push_back( { SCD_TEMP_TOPIC, String(scd_temp) } );
+    values.push_back( { SCD_HUMI_TOPIC, String(scd_humi) } );
+    values.push_back( { SCD_DEW_TOPIC, String(convertHumiToDP(scd_temp, scd_humi)) } );
+  }
+
+  return values;
+}
+
+/*void Disco_Sensors::setAlarmSensor(String parameter, float min, float max) {
   if (parameter == "TEMP") {
     temp_min = min;
     temp_max = max;
@@ -218,10 +318,10 @@ bool Disco_Sensors::checkSensorsTreshold() {
   }
 
   return false;
-}
+}*/
 
-void Disco_Sensors::printValues(String *data_array) {
-  for (int i = 0; i < data_array->length(); i++) {
-    Serial.println(data_array[i]);
+void Disco_Sensors::printValues(const SensorValues& values) {
+  for (const auto& reading: values) {
+    Serial.println(reading[0] + " -> " + reading[1]);
   }
 }
