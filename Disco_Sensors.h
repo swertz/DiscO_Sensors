@@ -7,16 +7,16 @@
 #include <SparkFunCCS811.h>
 #include <SparkFun_SCD30_Arduino_Library.h>
 #include <Wire.h>
-#include <vector>
 #include <limits>
+#include <vector>
 
 #define CCS811_ADDR 0x5A
 #define BME280_ADDR 0x76
 #define SCD30_ADDR 0x61
-#define DS_WIRE_POS 0  // position along the 1-wire chain
+#define DS_WIRE_POS 0 // position along the 1-wire chain
 
 //#define SDA_PIN 2  // for SCD30 board
-#define SDA_PIN 13  // for DS/BME board
+#define SDA_PIN 13 // for DS/BME board
 #define SCL_PIN 14
 #define ONE_WIRE_BUS 4
 
@@ -44,12 +44,13 @@ public:
   /**
    *  Constructor
    */
-  Disco_Sensors(uint16_t sda = SDA_PIN, uint16_t scl = SCL_PIN, uint16_t onewire = ONE_WIRE_BUS);
+  Disco_Sensors(uint16_t sda = SDA_PIN, uint16_t scl = SCL_PIN,
+                uint16_t onewire = ONE_WIRE_BUS);
 
-  void activateDS(bool active=true) { _active_ds = active; }
-  void activateBME(bool active=true) { _active_bme = active; }
-  void activateCCS(bool active=true) { _active_ccs = active; }
-  void activateSCD(bool active=true) { _active_scd = active; }
+  void activateDS(bool active = true) { _active_ds = active; }
+  void activateBME(bool active = true) { _active_bme = active; }
+  void activateCCS(bool active = true) { _active_ccs = active; }
+  void activateSCD(bool active = true) { _active_scd = active; }
 
   /**
    *  Initialises the Disco_Sensors Library
@@ -59,17 +60,17 @@ public:
   /**
    *  Read DS18B20
    */
-bool readDS(float &temp);
+  bool readDS(float &temp);
 
   /**
    *  Read Temperature of BME
    */
-bool readTempBME(float &temp);
+  bool readTempBME(float &temp);
 
   /**
    *  Read Humidity of BME
    */
-bool readHumiBME(float &humi);
+  bool readHumiBME(float &humi);
   /**
    *  Read Algorithm Results from CCS Sensor
    */
@@ -78,17 +79,17 @@ bool readHumiBME(float &humi);
   /**
    *  Read CO2 from CCS Algorithm
    */
-bool readCO2CCS(uint16_t &co2);
+  bool readCO2CCS(uint16_t &co2);
 
   /**
    *  Read TVOC from CCS Algorithm
    */
-bool readTVOCCCS(uint16_t &tvoc);
+  bool readTVOCCCS(uint16_t &tvoc);
 
   /**
    *  Read values from SCD sensor
    */
-bool readSCD(float &co2, float &temp, float &humi);
+  bool readSCD(float &co2, float &temp, float &humi);
   /**
    *  Get readings from every sensors on board
    */
@@ -97,17 +98,17 @@ bool readSCD(float &co2, float &temp, float &humi);
   /**
    *  Set Alarm Value for the Sensor choosen
    */
-  //void setAlarmSensor(String parameter, float min, float max);
+  // void setAlarmSensor(String parameter, float min, float max);
 
   /**
    *  Check Sensors values to trigger the alarm
    */
-  //bool checkSensorsTreshold();
+  // bool checkSensorsTreshold();
 
   /**
    *  Print value sensors
    */
-  void printValues(const SensorValues& values);
+  void printValues(const SensorValues &values);
 
 private:
   bool _active_ds = false;
@@ -120,25 +121,25 @@ private:
   uint16_t _scl_pin;
   uint16_t _onewire_bus;
 
-  OneWire* _oneWire = nullptr;
-  DallasTemperature* _ds = nullptr;
-  BME280* _bme = nullptr;
-  CCS811* _ccs = nullptr;
-  SCD30* _scd = nullptr;
+  OneWire *_oneWire = nullptr;
+  DallasTemperature *_ds = nullptr;
+  BME280 *_bme = nullptr;
+  CCS811 *_ccs = nullptr;
+  SCD30 *_scd = nullptr;
 
   bool _bmeDisconnected = false;
   bool _ccsReadAlgorithm = false;
 
   //// Status Alarm Variables
-  //bool alarmTemp;
-  //bool alarmHumi;
-  //bool alarmCO2;
-  //bool alarmTVOC;
+  // bool alarmTemp;
+  // bool alarmHumi;
+  // bool alarmCO2;
+  // bool alarmTVOC;
 
   //// Treshold Variables
-  //float temp_min, temp_max;
-  //float humi_min, humi_max;
-  //uint16_t co2_min, co2_max;
-  //uint16_t tvoc_min, tvoc_max;
+  // float temp_min, temp_max;
+  // float humi_min, humi_max;
+  // uint16_t co2_min, co2_max;
+  // uint16_t tvoc_min, tvoc_max;
 };
 #endif
