@@ -10,10 +10,10 @@ float convertHumiToDP(float temp, float humi) {
   return c * gm / (b - gm);
 }
 
-void Disco_Sensors::Disco_Sensors(uint16_t sda = SDA_PIN, uint16_t scl = SCL_PIN, uint16_t onewire = ONE_WIRE_BUS):
-    _sda_pin = sda,
-    _scl_pin = scl,
-    _onewire_bus = onewire) {}
+Disco_Sensors::Disco_Sensors(uint16_t sda, uint16_t scl, uint16_t onewire):
+    _sda_pin(sda),
+    _scl_pin(scl),
+    _onewire_bus(onewire) {}
 
 void Disco_Sensors::begin() {
   if (_active_ds) {
@@ -175,37 +175,13 @@ bool Disco_Sensors::readCCS() {
   }
 }
 
-bool Disco_Sensors::readCO2SCD(float &co2, float &temp, float &humi) {
+bool Disco_Sensors::readSCD(float &co2, float &temp, float &humi) {
   if (!_active_scd)
     return false;
 
   if (_scd->dataAvailable()) {
     co2 = _scd->getCO2();
     temp = _scd->getTemperature();
-    humi = _scd->getHumidity();
-    return true;
-  } else {
-    return false;
-  }
-}
-
-bool Disco_Sensors::readTempSCD(float &temp) {
-  if (!_active_scd)
-    return false;
-
-  if (_scd->dataAvailable()) {
-    temp = _scd->getTemperature();
-    return true;
-  } else {
-    return false;
-  }
-}
-
-bool Disco_Sensors::readHumiSCD(float &humi) {
-  if (!_active_scd)
-    return false;
-
-  if (_scd->dataAvailable()) {
     humi = _scd->getHumidity();
     return true;
   } else {
