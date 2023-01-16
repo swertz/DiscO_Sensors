@@ -9,33 +9,41 @@ void Disco_Linduino::begin() {
     Wire.begin(_sda_pin, _scl_pin);
 }
 
-SensorValues getReadings() {
-    std::vector<byte> msg;
-    std::size_t msg_length = sensors.channelCount() * 7;
-    msg.reserve(msg_length);
-    byte returned = Wire.requestFrom(DEVICE_ADDRESS, msg_length);
-    returned = min(returned, msg_length);
+float convertToFloat(byte sign, byte integral, byte decimal) {
+    float result = static_cast<float>(integral) + static_cast<float>(decimal) / 0x100;
+    if (sign == 1)
+        result = -result;
+    return result;
+}
 
-    bool success = true;
+SensorValues Disco_Linduino::getReadings() {
+    byte msg_length = channelCount() * 3;
+    byte returned = Wire.requestFrom(DEVICE_ADDRESS, static_cast<std::size_t>(msg_length));
+    Serial.println("Received " + String(returned) + " bytes");
+    SensorValues values;
+
+    if (msg_length != returned) {
+        Serial.println("Error: Linduino returned " + String(returned) + " bytes while " + String(msg_length) + " were expected");
+        return values;
+    }
+    std::vector<byte> msg;
+    msg.reserve(msg_length);
     for (std::size_t i = 0; i < returned; i++) {
         if (!Wire.available()) {
             Serial.println("Error: Linduino returned only " + String(i) + " bytes while " + String(msg_length) + " were expected");
-            success = false;
-            break;
+            return values;
         }
-        msg[i] = Wire.read();
+        msg.push_back(Wire.read());
+        Serial.print(msg[i]);
     }
+    Serial.println();
 
-    SensorValues values;
-    
-    if (success) {
-        values.reserve(channelCount());
-        for (std::size_t i = 0; i < channelCount(); i++) {
-            String topic(TEMP_TOPIC);
-            topic.replace("#NAME#", _channels[i].first);
-            String reading = (char*)(&msg[channels[i].second * 7]);
-            values.emplace_back(topic, reading);
-        }
+    values.reserve(channelCount());
+    for (std::size_t i = 0; i < channelCount(); i++) {
+        String topic(TEMP_TOPIC);
+        topic.replace("#NAME#", _channels[i].first);
+        float reading = convertToFloat(msg[3 * i], msg[3 * i + 1], msg[3 * i + 2]);
+        values.push_back({topic, String(reading)});
     }
 
     return values;

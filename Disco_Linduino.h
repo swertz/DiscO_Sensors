@@ -3,11 +3,10 @@
 
 #include <Wire.h>
 
-#include <ArduinoSTL.h>
 #include <vector>
 #include <ArduinoJson.h>
 
-#define SDA_PIN 13
+#define SDA_PIN 2  // why!!??
 #define SCL_PIN 14
 
 #define DEVICE_ADDRESS 0x08 // I2C slave ID
