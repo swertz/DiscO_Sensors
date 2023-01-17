@@ -13,6 +13,8 @@
                             //
 #define TEMP_TOPIC F("/sensors/RTD/CHAN#NAME#/temp")
 
+#define LOWEST std::numeric_limits<float>::lowest()
+
 // holds { topic, value } for every measurement
 typedef std::vector<std::vector<String>> SensorValues;
 

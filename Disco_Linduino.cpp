@@ -9,11 +9,14 @@ void Disco_Linduino::begin() {
     Wire.begin(_sda_pin, _scl_pin);
 }
 
-float convertToFloat(byte sign, byte integral, byte decimal) {
-    float result = static_cast<float>(integral) + static_cast<float>(decimal) / 0x100;
+bool convertToFloat(float &temp, byte sign, byte integral, byte decimal) {
+    if (sign == 2) {
+        return false;
+    }
+    temp = static_cast<float>(integral) + static_cast<float>(decimal) / 0x100;
     if (sign == 1)
-        result = -result;
-    return result;
+        temp = -temp;
+    return true;
 }
 
 SensorValues Disco_Linduino::getReadings() {
@@ -42,8 +45,12 @@ SensorValues Disco_Linduino::getReadings() {
     for (std::size_t i = 0; i < channelCount(); i++) {
         String topic(TEMP_TOPIC);
         topic.replace("#NAME#", _channels[i].first);
-        float reading = convertToFloat(msg[3 * i], msg[3 * i + 1], msg[3 * i + 2]);
-        values.push_back({topic, String(reading)});
+        float temp = LOWEST;
+        if (convertToFloat(msg[3 * i], msg[3 * i + 1], msg[3 * i + 2])) {
+            values.push_back({topic, String(reading)});
+        } else {
+            Serial.println("Error reading temperature for channel " + _channels[i].first);
+        }
     }
 
     return values;
